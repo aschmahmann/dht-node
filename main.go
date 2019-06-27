@@ -111,12 +111,12 @@ func bootstrapper() pstore.PeerInfo {
 
 var bootstrapDone int64
 
-func makeHost(addr string, relay bool) host.Host{
+func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
 	cmgr := connmgr.NewConnManager(3000, 4000, time.Minute)
 
 	priv, _, _ := crypto.GenerateKeyPair(crypto.Ed25519, 0)
 
-	opts := []libp2p.Option{libp2p.ListenAddrStrings(addr), libp2p.ConnectionManager(cmgr), libp2p.Identity(priv)}
+	opts := []libp2p.Option{libp2p.ListenAddrStrings(addr), libp2p.ConnectionManager(cmgr), libp2p.Identity(priv), libp2p.Peerstore(ps)}
 	if relay {
 		opts = append(opts, libp2p.EnableRelay(circuit.OptHop))
 	}
@@ -226,18 +226,19 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 	uniqpeers := make(map[peer.ID]struct{})
 	fmt.Fprintf(os.Stderr, "Running %d DHT Instances...\n", many)
 
+	ps := pstoremem.NewPeerstore()
+
 	for i := 0; i< many; i++ {
 		laddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", getPort())
-		h := makeHost(laddr, relay)
+		h := makeHost(laddr, relay, ps)
 		hosts = append(hosts, h)
 	}
 
 	rt := &kbucket.RoutingTable{Rt:kbucket.NewTrieRoutingTable()}
-	ps := pstoremem.NewPeerstore()
 
 	limiter := make(chan struct{}, bsCon)
 	for i := 0; i < many; i++ {
-		d := makeAndStartNode(ds, hosts[i], bucketSize, limiter, rt, ps)
+		d := makeAndStartNode(ds, hosts[i], bucketSize, limiter, rt, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -288,10 +289,11 @@ func runSingleDHTWithUI(path string, relay bool, bucketSize int) {
 		panic(err)
 	}
 
-	h := makeHost("/ip4/0.0.0.0/tcp/19264", relay)
+	ps := pstoremem.NewPeerstore()
+	h := makeHost("/ip4/0.0.0.0/tcp/19264", relay, ps)
 	rt := &kbucket.RoutingTable{Rt:kbucket.NewTrieRoutingTable()}
 
-	_ = makeAndStartNode(ds, h, bucketSize, nil, rt, pstoremem.NewPeerstore())
+	_ = makeAndStartNode(ds, h, bucketSize, nil, rt, nil)
 
 	uniqpeers := make(map[peer.ID]struct{})
 	messages := make(chan string, 16)
