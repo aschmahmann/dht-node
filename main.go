@@ -118,7 +118,7 @@ func makeAndStartNode(ds ds.Batching, addr string, relay bool, bucketSize int, l
 		panic(err)
 	}
 
-	d, err := dht.New(context.Background(), h, dhtopts.BucketSize(bucketSize), dhtopts.Datastore(ds))
+	d, err := dht.New(context.Background(), h, dhtopts.BucketSize(bucketSize), dhtopts.Datastore(ds), dhtopts.UseTrieRoutingTable(true))
 	if err != nil {
 		panic(err)
 	}

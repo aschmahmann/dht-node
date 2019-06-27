@@ -26,3 +26,9 @@ require (
 	golang.org/x/sys v0.0.0-20190531175056-4c3a928424d2 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
+
+replace github.com/libp2p/go-libp2p-kad-dht => github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb
+
+replace github.com/libp2p/go-libp2p-kbucket => github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha
+
+replace github.com/k-sone/critbitgo v1.2.0 => github.com/aschmahmann/critbitgo v1.3.0-alpha
