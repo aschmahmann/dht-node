@@ -11,8 +11,12 @@ github.com/aschmahmann/critbitgo v1.3.0-alpha h1:4UQ57zKcfVvUSY9E5XsY7l2XUZDh5wF
 github.com/aschmahmann/critbitgo v1.3.0-alpha/go.mod h1:xA9jdbTNTENSKO5yH5T1DUQxZPi+fg2VMTjKr0Mi4UI=
 github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb h1:JYhRxr8z6KbVadE3l2kkKwHC5x0EVLnV2YO9xnCDAV8=
 github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb/go.mod h1:oRi3PetAR8q9vT9gqZxSdw1N2y6wpJWLc52Yq2InqmQ=
+github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb2 h1:PQiOjhC53ty4CAZxVx+V7ZrtdPHkCa582SSqB+EQv/s=
+github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb2/go.mod h1:k7JviGlpplTEfaFv50Fpj7TZsByD6foXrCQdqUNfQ0o=
 github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha h1:ptBp4Ieu4yAIJ92eC3mGLqywVGSTWQOEeapRl6c5To0=
 github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha/go.mod h1:1HVXqUBh6abIcdgLjkTzrNhOjbAfp/GvzWKWbpMjBGY=
+github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha2 h1:RPWLnOArNrXMlEoy7uJIN2T/nHg38v95zkn8IcO6DcU=
+github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha2/go.mod h1:1HVXqUBh6abIcdgLjkTzrNhOjbAfp/GvzWKWbpMjBGY=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0 h1:HWo1m869IqiPhD389kmkxeTalrjNbbJTC8LXupb+sl0=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=

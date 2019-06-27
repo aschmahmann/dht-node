@@ -6,6 +6,7 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
+	kbucket "github.com/libp2p/go-libp2p-kbucket"
 	"io"
 	"math/rand"
 	"net/http"
@@ -105,7 +106,7 @@ func bootstrapper() pstore.PeerInfo {
 
 var bootstrapDone int64
 
-func makeAndStartNode(ds ds.Batching, addr string, relay bool, bucketSize int, limiter chan struct{}) (host.Host, *dht.IpfsDHT, error) {
+func makeHost(addr string, relay bool) host.Host{
 	cmgr := connmgr.NewConnManager(3000, 4000, time.Minute)
 
 	opts := []libp2p.Option{libp2p.ListenAddrStrings(addr), libp2p.ConnectionManager(cmgr)}
@@ -117,8 +118,11 @@ func makeAndStartNode(ds ds.Batching, addr string, relay bool, bucketSize int, l
 	if err != nil {
 		panic(err)
 	}
+	return h
+}
 
-	d, err := dht.New(context.Background(), h, dhtopts.BucketSize(bucketSize), dhtopts.Datastore(ds), dhtopts.UseTrieRoutingTable(true))
+func makeAndStartNode(ds ds.Batching, h host.Host, bucketSize int, limiter chan struct{}, rt *kbucket.RoutingTable) *dht.IpfsDHT {
+	d, err := dht.New(context.Background(), h, dhtopts.BucketSize(bucketSize), dhtopts.Datastore(ds), dhtopts.UseRoutingTable(rt))
 	if err != nil {
 		panic(err)
 	}
@@ -153,7 +157,7 @@ func makeAndStartNode(ds ds.Batching, addr string, relay bool, bucketSize int, l
 		atomic.AddInt64(&bootstrapDone, 1)
 
 	}()
-	return h, d, nil
+	return d
 }
 
 func portSelector(beg int) func() int {
@@ -215,14 +219,20 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 	uniqpeers := make(map[peer.ID]struct{})
 	fmt.Fprintf(os.Stderr, "Running %d DHT Instances...\n", many)
 
+	for i := 0; i< many; i++ {
+		laddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", getPort())
+		h := makeHost(laddr, relay)
+		hosts = append(hosts, h)
+	}
+
+	rt := &kbucket.RoutingTable{Rt:kbucket.NewTrieRoutingTable()}
+
 	limiter := make(chan struct{}, bsCon)
 	for i := 0; i < many; i++ {
-		laddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", getPort())
-		h, d, err := makeAndStartNode(ds, laddr, relay, bucketSize, limiter)
+		d := makeAndStartNode(ds, hosts[i], bucketSize, limiter, rt)
 		if err != nil {
 			panic(err)
 		}
-		hosts = append(hosts, h)
 		dhts = append(dhts, d)
 	}
 
@@ -268,10 +278,10 @@ func runSingleDHTWithUI(path string, relay bool, bucketSize int) {
 	if err != nil {
 		panic(err)
 	}
-	h, _, err := makeAndStartNode(ds, "/ip4/0.0.0.0/tcp/19264", relay, bucketSize, nil)
-	if err != nil {
-		panic(err)
-	}
+
+	h := makeHost("/ip4/0.0.0.0/tcp/19264", relay)
+
+	_ = makeAndStartNode(ds, h, bucketSize, nil, nil)
 
 	uniqpeers := make(map[peer.ID]struct{})
 	messages := make(chan string, 16)

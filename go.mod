@@ -13,6 +13,7 @@ require (
 	github.com/libp2p/go-libp2p-connmgr v0.1.0
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.1.2-0.20190626232611-138991d438ce
+	github.com/libp2p/go-libp2p-kbucket v0.2.0
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-peerstore v0.1.2-0.20190621130618-cfa9bb890c1a
@@ -27,8 +28,8 @@ require (
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
 
-replace github.com/libp2p/go-libp2p-kad-dht => github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb
+replace github.com/libp2p/go-libp2p-kad-dht => github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb2
 
-replace github.com/libp2p/go-libp2p-kbucket => github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha
+replace github.com/libp2p/go-libp2p-kbucket => github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha2
 
 replace github.com/k-sone/critbitgo v1.2.0 => github.com/aschmahmann/critbitgo v1.3.0-alpha
