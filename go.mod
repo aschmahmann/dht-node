@@ -11,6 +11,7 @@ require (
 	github.com/libp2p/go-libp2p v0.1.3-0.20190626170235-f299d252e778
 	github.com/libp2p/go-libp2p-circuit v0.1.0
 	github.com/libp2p/go-libp2p-connmgr v0.1.0
+	github.com/libp2p/go-libp2p-core v0.0.7-0.20190626134135-aca080dccfc2
 	github.com/libp2p/go-libp2p-host v0.1.0
 	github.com/libp2p/go-libp2p-kad-dht v0.1.2-0.20190626232611-138991d438ce
 	github.com/libp2p/go-libp2p-kbucket v0.2.0
@@ -28,7 +29,9 @@ require (
 	gopkg.in/yaml.v2 v2.2.2 // indirect
 )
 
-replace github.com/libp2p/go-libp2p-kad-dht => github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb2
+replace github.com/libp2p/go-libp2p-peerstore => github.com/aschmahmann/go-libp2p-peerstore v0.1.1-qb
+
+replace github.com/libp2p/go-libp2p-kad-dht => github.com/aschmahmann/go-libp2p-kad-dht v0.1.2-qb3
 
 replace github.com/libp2p/go-libp2p-kbucket => github.com/aschmahmann/go-libp2p-kbucket v0.2.1-alpha2
 

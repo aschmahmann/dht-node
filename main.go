@@ -6,7 +6,9 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	"io"
 	"math/rand"
 	"net/http"
@@ -121,8 +123,8 @@ func makeHost(addr string, relay bool) host.Host{
 	return h
 }
 
-func makeAndStartNode(ds ds.Batching, h host.Host, bucketSize int, limiter chan struct{}, rt *kbucket.RoutingTable) *dht.IpfsDHT {
-	d, err := dht.New(context.Background(), h, dhtopts.BucketSize(bucketSize), dhtopts.Datastore(ds), dhtopts.UseRoutingTable(rt))
+func makeAndStartNode(ds ds.Batching, h host.Host, bucketSize int, limiter chan struct{}, rt *kbucket.RoutingTable, ps peerstore.Peerstore) *dht.IpfsDHT {
+	d, err := dht.New(context.Background(), h, dhtopts.BucketSize(bucketSize), dhtopts.Datastore(ds), dhtopts.UseRoutingTable(rt), dhtopts.Peerstore(ps))
 	if err != nil {
 		panic(err)
 	}
@@ -226,10 +228,11 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 	}
 
 	rt := &kbucket.RoutingTable{Rt:kbucket.NewTrieRoutingTable()}
+	ps := pstoremem.NewPeerstore()
 
 	limiter := make(chan struct{}, bsCon)
 	for i := 0; i < many; i++ {
-		d := makeAndStartNode(ds, hosts[i], bucketSize, limiter, rt)
+		d := makeAndStartNode(ds, hosts[i], bucketSize, limiter, rt, ps)
 		if err != nil {
 			panic(err)
 		}
@@ -280,8 +283,9 @@ func runSingleDHTWithUI(path string, relay bool, bucketSize int) {
 	}
 
 	h := makeHost("/ip4/0.0.0.0/tcp/19264", relay)
+	rt := &kbucket.RoutingTable{Rt:kbucket.NewTrieRoutingTable()}
 
-	_ = makeAndStartNode(ds, h, bucketSize, nil, nil)
+	_ = makeAndStartNode(ds, h, bucketSize, nil, rt, pstoremem.NewPeerstore())
 
 	uniqpeers := make(map[peer.ID]struct{})
 	messages := make(chan string, 16)
