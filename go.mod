@@ -19,6 +19,8 @@ require (
 	github.com/libp2p/go-libp2p-peer v0.2.0
 	github.com/libp2p/go-libp2p-peerstore v0.1.2-0.20190621130618-cfa9bb890c1a
 	github.com/libp2p/go-libp2p-record v0.1.0
+	github.com/libp2p/go-libp2p-swarm v0.1.1-0.20190606081407-8be680aef8de // indirect
+	github.com/libp2p/go-maddr-filter v0.0.5-0.20190627145032-4d5679194bce // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/opentracing/opentracing-go v1.1.0 // indirect

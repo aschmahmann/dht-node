@@ -28,6 +28,7 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
+	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	host "github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtmetrics "github.com/libp2p/go-libp2p-kad-dht/metrics"
@@ -42,7 +43,9 @@ import (
 	"go.opencensus.io/zpages"
 )
 
+var _ = dhtmetrics.DefaultViews
 var _ = circuit.P_CIRCUIT
+var _ = logwriter.WriterGroup
 
 var (
 	log           = logging.Logger("dhtbooster")
@@ -111,7 +114,9 @@ var bootstrapDone int64
 func makeHost(addr string, relay bool) host.Host{
 	cmgr := connmgr.NewConnManager(3000, 4000, time.Minute)
 
-	opts := []libp2p.Option{libp2p.ListenAddrStrings(addr), libp2p.ConnectionManager(cmgr)}
+	priv, _, _ := crypto.GenerateKeyPair(crypto.Ed25519, 0)
+
+	opts := []libp2p.Option{libp2p.ListenAddrStrings(addr), libp2p.ConnectionManager(cmgr), libp2p.Identity(priv)}
 	if relay {
 		opts = append(opts, libp2p.EnableRelay(circuit.OptHop))
 	}
@@ -192,7 +197,7 @@ func main() {
 	}
 
 	if *pprofport > 0 {
-		fmt.Println("Running metrics server on port: %d", *pprofport)
+		fmt.Printf("Running metrics server on port: %d\n", *pprofport)
 		go setupMetrics(*pprofport)
 	}
 
@@ -240,9 +245,9 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 	}
 
 	provs := make(chan *provInfo, 16)
-	r, w := io.Pipe()
-	logwriter.WriterGroup.AddWriter(w)
-	go waitForNotifications(r, provs, nil)
+	//r, w := io.Pipe()
+	//logwriter.WriterGroup.AddWriter(w)
+	//go waitForNotifications(r, provs, nil)
 
 	totalprovs := 0
 	reportInterval := time.NewTicker(time.Second * 5)
@@ -251,6 +256,7 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 		case _, ok := <-provs:
 			if !ok {
 				totalprovs = -1
+				provs = nil
 			} else {
 				totalprovs++
 			}
@@ -290,9 +296,9 @@ func runSingleDHTWithUI(path string, relay bool, bucketSize int) {
 	uniqpeers := make(map[peer.ID]struct{})
 	messages := make(chan string, 16)
 	provs := make(chan *provInfo, 16)
-	r, w := io.Pipe()
-	logwriter.WriterGroup.AddWriter(w)
-	go waitForNotifications(r, provs, messages)
+	//r, w := io.Pipe()
+	//logwriter.WriterGroup.AddWriter(w)
+	//go waitForNotifications(r, provs, messages)
 
 	ga := &GooeyApp{Title: "Libp2p DHT Node", Log: NewLog(15, 15)}
 	ga.NewDataLine(3, "Peer ID", h.ID().Pretty())
@@ -353,6 +359,8 @@ func setupMetrics(port int) error {
 		return err
 	}
 
+	_ = view.RegisterExporter
+	/* Disabling opencensus for now, it allocates too much
 	// register prometheus with opencensus
 	view.RegisterExporter(pe)
 	view.SetReportingPeriod(2)
@@ -361,6 +369,7 @@ func setupMetrics(port int) error {
 	if err := view.Register(dhtmetrics.DefaultViews...); err != nil {
 		return err
 	}
+	*/
 
 	go func() {
 		mux := http.NewServeMux()
