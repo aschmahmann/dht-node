@@ -125,6 +125,12 @@ func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("Host %s \n", h.ID())
+	for _, addr := range h.Addrs(){
+		fmt.Println("Listening On: ", addr)
+	}
+	fmt.Println("-------------------")
 	return h
 }
 
