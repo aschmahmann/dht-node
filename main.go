@@ -127,11 +127,11 @@ func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
 		panic(err)
 	}
 
-	logger.Warningf("Host %s \n", h.ID())
+	logger.Errorf("Host %s \n", h.ID())
 	for _, addr := range h.Addrs(){
-		logger.Warningf("Listening On: ", addr)
+		logger.Errorf("Listening On: ", addr)
 	}
-	logger.Warningf("-------------------")
+	logger.Errorf("-------------------")
 	return h
 }
 
