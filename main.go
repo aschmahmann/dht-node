@@ -110,6 +110,7 @@ func bootstrapper() pstore.PeerInfo {
 }
 
 var bootstrapDone int64
+var logger = logging.Logger("dht")
 
 func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
 	cmgr := connmgr.NewConnManager(3000, 4000, time.Minute)
@@ -126,11 +127,11 @@ func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
 		panic(err)
 	}
 
-	fmt.Printf("Host %s \n", h.ID())
+	logger.Warningf("Host %s \n", h.ID())
 	for _, addr := range h.Addrs(){
-		fmt.Println("Listening On: ", addr)
+		logger.Warningf("Listening On: ", addr)
 	}
-	fmt.Println("-------------------")
+	logger.Warningf("-------------------")
 	return h
 }
 
