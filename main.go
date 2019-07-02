@@ -25,6 +25,7 @@ import (
 	human "github.com/dustin/go-humanize"
 
 	ds "github.com/ipfs/go-datastore"
+	nsds "github.com/ipfs/go-datastore/namespace"
 	levelds "github.com/ipfs/go-ds-leveldb"
 	ipns "github.com/ipfs/go-ipns"
 	logging "github.com/ipfs/go-log"
@@ -41,6 +42,7 @@ import (
 	dhtmetrics "github.com/libp2p/go-libp2p-kad-dht/metrics"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	"github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
 	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	record "github.com/libp2p/go-libp2p-record"
 	id "github.com/libp2p/go-libp2p/p2p/protocol/identify"
@@ -221,10 +223,16 @@ func main() {
 }
 
 func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, relay bool, stagger time.Duration) {
-	ds, err := levelds.NewDatastore(dbpath, nil)
+	dstore, err := levelds.NewDatastore(dbpath, nil)
 	if err != nil {
 		panic(err)
 	}
+
+	ps, err := pstoreds.NewPeerstore(context.Background(), nsds.Wrap(dstore, ds.NewKey("/pstore")), pstoreds.DefaultOpts())
+	if err != nil {
+		panic(err)
+	}
+
 
 	start := time.Now()
 	var hosts []host.Host
@@ -249,8 +257,6 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 
 	fmt.Fprintf(os.Stderr, "Running %d DHT Instances:\n", many)
 
-	ps := pstoremem.NewPeerstore()
-
 	for i := 0; i< many; i++ {
 		laddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", getPort())
 		h := makeHost(laddr, relay, ps)
@@ -265,7 +271,7 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 		fmt.Fprintf(os.Stderr, ".")
 		h := hosts[i]
 
-		d := makeAndStartNode(ds, h, bucketSize, limiter, rt, nil)
+		d := makeAndStartNode(dstore, h, bucketSize, limiter, rt, nil)
 		if err != nil {
 			panic(err)
 		}
