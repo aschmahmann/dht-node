@@ -229,7 +229,7 @@ func runMany(dbpath string, keydb string, memps bool, getPort func() int, many, 
 	}
 
 	var ps peerstore.Peerstore
-	if memps {
+	if !memps {
 		ps, err = pstoreds.NewPeerstore(context.Background(), nsds.Wrap(dstore, ds.NewKey("/pstore")), pstoreds.DefaultOpts())
 		if err != nil {
 			panic(err)
