@@ -117,10 +117,8 @@ func bootstrapper() peer.AddrInfo {
 
 var bootstrapDone int64
 
-func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
+func makeHost(addr string, priv crypto.PrivKey, relay bool, ps peerstore.Peerstore) host.Host{
 	cmgr := connmgr.NewConnManager(3000, 4000, time.Minute)
-
-	priv, _, _ := crypto.GenerateKeyPair(crypto.Ed25519, 0)
 
 	opts := []libp2p.Option{libp2p.ListenAddrStrings(addr), libp2p.ConnectionManager(cmgr), libp2p.Identity(priv), libp2p.Peerstore(ps)}
 	if relay {
@@ -197,6 +195,7 @@ func main() {
 	bucketSize := flag.Int("bucketSize", defaultKValue, "Specify the bucket size")
 	bootstrapConcurency := flag.Int("bootstrapConc", 32, "How many concurrent bootstraps to run")
 	stagger := flag.Duration("stagger", 0*time.Second, "Duration to stagger nodes starts by")
+	keydb := flag.String("keydb", "key-data", "Key Database folder")
 	flag.Parse()
 	id.ClientVersion = "dhtbooster/2"
 
@@ -219,10 +218,10 @@ func main() {
 		return
 	}
 
-	runMany(*dbpath, getPort, *many, *bucketSize, *bootstrapConcurency, *relay, *stagger)
+	runMany(*dbpath, *keydb, getPort, *many, *bucketSize, *bootstrapConcurency, *relay, *stagger)
 }
 
-func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, relay bool, stagger time.Duration) {
+func runMany(dbpath string, keydb string, getPort func() int, many, bucketSize, bsCon int, relay bool, stagger time.Duration) {
 	dstore, err := levelds.NewDatastore(dbpath, nil)
 	if err != nil {
 		panic(err)
@@ -233,6 +232,10 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 		panic(err)
 	}
 
+	ks, err := levelds.NewDatastore(keydb, nil)
+	if err != nil {
+		panic(err)
+	}
 
 	start := time.Now()
 	var hosts []host.Host
@@ -259,7 +262,25 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 
 	for i := 0; i< many; i++ {
 		laddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", getPort())
-		h := makeHost(laddr, relay, ps)
+		dbKey := ds.NewKey(fmt.Sprintf("/keys/host/%d", i))
+		k, err := ks.Get(dbKey)
+		var priv crypto.PrivKey
+		if err == nil {
+			priv, err = crypto.UnmarshalPrivateKey(k)
+		}
+
+		if err != nil{
+			priv, _, _ = crypto.GenerateKeyPair(crypto.Ed25519, 0)
+			ba, err := crypto.MarshalPrivateKey(priv)
+			if err != nil {
+				panic(err)
+			}
+			if err := ks.Put(dbKey, ba); err != nil{
+				panic(err)
+			}
+		}
+
+		h := makeHost(laddr, priv, relay, ps)
 		hosts = append(hosts, h)
 	}
 
@@ -336,7 +357,8 @@ func runSingleDHTWithUI(path string, relay bool, bucketSize int) {
 	}
 
 	ps := pstoremem.NewPeerstore()
-	h := makeHost("/ip4/0.0.0.0/tcp/19264", relay, ps)
+	priv, _, _ := crypto.GenerateKeyPair(crypto.Ed25519, 0)
+	h := makeHost("/ip4/0.0.0.0/tcp/19264", priv, relay, ps)
 	rt := &kbucket.RoutingTable{Rt:kbucket.NewTrieRoutingTable()}
 
 	_ = makeAndStartNode(ds, h, bucketSize, nil, rt, nil)
