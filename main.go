@@ -6,20 +6,24 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/peerstore"
-	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	"io"
 	"math/rand"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"contrib.go.opencensus.io/exporter/prometheus"
+	prom "github.com/prometheus/client_golang/prometheus"
+	"go.opencensus.io/stats/view"
+	"go.opencensus.io/zpages"
+
+	"github.com/axiomhq/hyperloglog"
 	human "github.com/dustin/go-humanize"
+
 	ds "github.com/ipfs/go-datastore"
 	levelds "github.com/ipfs/go-ds-leveldb"
 	ipns "github.com/ipfs/go-ipns"
@@ -29,18 +33,19 @@ import (
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	connmgr "github.com/libp2p/go-libp2p-connmgr"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	network "github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	host "github.com/libp2p/go-libp2p-host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dhtmetrics "github.com/libp2p/go-libp2p-kad-dht/metrics"
 	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
+	"github.com/libp2p/go-libp2p-kbucket"
 	peer "github.com/libp2p/go-libp2p-peer"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
+	"github.com/libp2p/go-libp2p-peerstore/pstoremem"
 	record "github.com/libp2p/go-libp2p-record"
 	id "github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	ma "github.com/multiformats/go-multiaddr"
-	prom "github.com/prometheus/client_golang/prometheus"
-	"go.opencensus.io/stats/view"
-	"go.opencensus.io/zpages"
 )
 
 var _ = dhtmetrics.DefaultViews
@@ -110,7 +115,6 @@ func bootstrapper() pstore.PeerInfo {
 }
 
 var bootstrapDone int64
-var logger = logging.Logger("dht")
 
 func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
 	cmgr := connmgr.NewConnManager(3000, 4000, time.Minute)
@@ -127,11 +131,6 @@ func makeHost(addr string, relay bool, ps peerstore.Peerstore) host.Host{
 		panic(err)
 	}
 
-	logger.Errorf("Host %s \n", h.ID())
-	for _, addr := range h.Addrs(){
-		logger.Errorf("Listening On: ", addr)
-	}
-	logger.Errorf("-------------------")
 	return h
 }
 
@@ -195,7 +194,8 @@ func main() {
 	relay := flag.Bool("relay", false, "Enable libp2p circuit relaying for this node")
 	portBegin := flag.Int("portBegin", 0, "If set, begin port allocation here")
 	bucketSize := flag.Int("bucketSize", defaultKValue, "Specify the bucket size")
-	bootstrapConcurency := flag.Int("bootstrapConc", 128, "How many concurrent bootstraps to run")
+	bootstrapConcurency := flag.Int("bootstrapConc", 32, "How many concurrent bootstraps to run")
+	stagger := flag.Duration("stagger", 0*time.Second, "Duration to stagger nodes starts by")
 	flag.Parse()
 	id.ClientVersion = "dhtbooster/2"
 
@@ -218,10 +218,10 @@ func main() {
 		return
 	}
 
-	runMany(*dbpath, getPort, *many, *bucketSize, *bootstrapConcurency, *relay)
+	runMany(*dbpath, getPort, *many, *bucketSize, *bootstrapConcurency, *relay, *stagger)
 }
 
-func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, relay bool) {
+func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, relay bool, stagger time.Duration) {
 	ds, err := levelds.NewDatastore(dbpath, nil)
 	if err != nil {
 		panic(err)
@@ -230,8 +230,25 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 	start := time.Now()
 	var hosts []host.Host
 	var dhts []*dht.IpfsDHT
-	uniqpeers := make(map[peer.ID]struct{})
-	fmt.Fprintf(os.Stderr, "Running %d DHT Instances...\n", many)
+
+	var hyperLock sync.Mutex
+	hyperlog := hyperloglog.New()
+	var peersConnected int64
+
+	notifiee := &network.NotifyBundle{
+		ConnectedF: func(_ network.Network, v network.Conn) {
+			hyperLock.Lock()
+			hyperlog.Insert([]byte(v.RemotePeer()))
+			hyperLock.Unlock()
+
+			atomic.AddInt64(&peersConnected, 1)
+		},
+		DisconnectedF: func(_ network.Network, v network.Conn) {
+			atomic.AddInt64(&peersConnected, -1)
+		},
+	}
+
+	fmt.Fprintf(os.Stderr, "Running %d DHT Instances:\n", many)
 
 	ps := pstoremem.NewPeerstore()
 
@@ -245,12 +262,18 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 
 	limiter := make(chan struct{}, bsCon)
 	for i := 0; i < many; i++ {
-		d := makeAndStartNode(ds, hosts[i], bucketSize, limiter, rt, nil)
+		time.Sleep(stagger)
+		fmt.Fprintf(os.Stderr, ".")
+		h := hosts[i]
+
+		d := makeAndStartNode(ds, h, bucketSize, limiter, rt, nil)
 		if err != nil {
 			panic(err)
 		}
+		h.Network().Notify(notifiee)
 		dhts = append(dhts, d)
 	}
+	fmt.Fprintf(os.Stderr, "\n")
 
 	provs := make(chan *provInfo, 16)
 	//r, w := io.Pipe()
@@ -269,25 +292,20 @@ func runMany(dbpath string, getPort func() int, many, bucketSize, bsCon int, rel
 				totalprovs++
 			}
 		case <-reportInterval.C:
-			printStatusLine(many, start, hosts, dhts, uniqpeers, totalprovs)
+			hyperLock.Lock()
+			uniqpeers := hyperlog.Estimate()
+			hyperLock.Unlock()
+			printStatusLine(many, start, atomic.LoadInt64(&peersConnected), uniqpeers, totalprovs)
 		}
 	}
 }
 
-func printStatusLine(ndht int, start time.Time, hosts []host.Host, dhts []*dht.IpfsDHT, uniqprs map[peer.ID]struct{}, totalprovs int) {
+func printStatusLine(ndht int, start time.Time, totalpeers int64, uniqpeers uint64, totalprovs int) {
 	uptime := time.Second * time.Duration(int(time.Since(start).Seconds()))
 	var mstat runtime.MemStats
 	runtime.ReadMemStats(&mstat)
-	var totalpeers int
-	for _, h := range hosts {
-		peers := h.Network().Peers()
-		totalpeers += len(peers)
-		for _, p := range peers {
-			uniqprs[p] = struct{}{}
-		}
-	}
 
-	fmt.Fprintf(os.Stderr, "[NumDhts: %d, Uptime: %s, Memory Usage: %s, TotalPeers: %d/%d, Total Provs: %d, BootstrapsDone: %d]\n", ndht, uptime, human.Bytes(mstat.Alloc), totalpeers, len(uniqprs), totalprovs, atomic.LoadInt64(&bootstrapDone))
+	fmt.Fprintf(os.Stderr, "[NumDhts: %d, Uptime: %s, Memory Usage: %s, TotalPeers: %d/%d, Total Provs: %d, BootstrapsDone: %d]\n", ndht, uptime, human.Bytes(mstat.Alloc), totalpeers, uniqpeers, totalprovs, atomic.LoadInt64(&bootstrapDone))
 }
 
 func runSingleDHTWithUI(path string, relay bool, bucketSize int) {
