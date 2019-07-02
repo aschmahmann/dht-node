@@ -196,6 +196,7 @@ func main() {
 	bootstrapConcurency := flag.Int("bootstrapConc", 32, "How many concurrent bootstraps to run")
 	stagger := flag.Duration("stagger", 0*time.Second, "Duration to stagger nodes starts by")
 	keydb := flag.String("keydb", "key-data", "Key Database folder")
+	memps := flag.Bool("memps", false, "Use an in-memory peerstore")
 	flag.Parse()
 	id.ClientVersion = "dhtbooster/2"
 
@@ -218,18 +219,23 @@ func main() {
 		return
 	}
 
-	runMany(*dbpath, *keydb, getPort, *many, *bucketSize, *bootstrapConcurency, *relay, *stagger)
+	runMany(*dbpath, *keydb, *memps, getPort, *many, *bucketSize, *bootstrapConcurency, *relay, *stagger)
 }
 
-func runMany(dbpath string, keydb string, getPort func() int, many, bucketSize, bsCon int, relay bool, stagger time.Duration) {
+func runMany(dbpath string, keydb string, memps bool, getPort func() int, many, bucketSize, bsCon int, relay bool, stagger time.Duration) {
 	dstore, err := levelds.NewDatastore(dbpath, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	ps, err := pstoreds.NewPeerstore(context.Background(), nsds.Wrap(dstore, ds.NewKey("/pstore")), pstoreds.DefaultOpts())
-	if err != nil {
-		panic(err)
+	var ps peerstore.Peerstore
+	if memps {
+		ps, err = pstoreds.NewPeerstore(context.Background(), nsds.Wrap(dstore, ds.NewKey("/pstore")), pstoreds.DefaultOpts())
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		ps = pstoremem.NewPeerstore()
 	}
 
 	ks, err := levelds.NewDatastore(keydb, nil)
